@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOVE.exe</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        /* === BASE STYLES === */
+        body {
+            background-color: #f4f4f5;
+            font-family: 'VT323', monospace;
+            margin: 0;
+            overflow: hidden; 
+            color: #333;
+            transition: background-color 1s ease;
+        }
+        .hidden { display: none !important; }
+
+        /* === LIQUID FILL EFFECT === */
+        #liquid-bg {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 0%; 
+            background-color: #ffb3c6; 
+            z-index: -1;
+            transition: height 1s ease-in-out;
+        }
+        #liquid-bg::before {
+            content: "";
+            position: absolute;
+            top: -19px;
+            left: 0;
+            width: 100%;
+            height: 20px;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffb3c6" fill-opacity="1" d="M0,160L48,170.7C96,181,192,203,288,197.3C384,192,480,160,576,149.3C672,139,768,149,864,165.3C960,181,1056,203,1152,186.7C1248,171,1344,117,1392,90.7L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') repeat-x;
+            background-size: 1440px 20px;
+            animation: wave 3s linear infinite;
+        }
+        @keyframes wave {
+            0% { background-position-x: 0; }
+            100% { background-position-x: 1440px; }
+        }
+
+        /* === GAME UI === */
+        #game-ui {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100%;
+        }
+        .window {
+            background: #fff;
+            border: 2px solid #333;
+            border-radius: 4px;
+            box-shadow: 6px 6px 0px #d1d1d1;
+            width: 90%;
+            max-width: 600px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background-color: rgba(255, 255, 255, 0.95);
+        }
+        .title-bar {
+            background: #e8e8e8;
+            border-bottom: 2px solid #333;
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 22px;
+            font-weight: bold;
+        }
+        .dots { display: flex; gap: 5px; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #333; }
+        .dot.red { background: #ff5f56; }
+        .dot.yellow { background: #ffbd2e; }
+        .dot.green { background: #27c93f; }
+        
+        .content { padding: 30px; display: flex; flex-direction: column; align-items: center; min-height: 250px; justify-content: center; }
+        
+        h1 { font-size: 36px; margin-bottom: 10px; color: #333; }
+        p { font-size: 24px; margin-bottom: 20px; line-height: 1.4; }
+        
+        .heart-icon { font-size: 40px; color: #e91e63; margin-bottom: 10px; }
+        .pulsing-heart { animation: pulse 1s infinite; cursor: pointer; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+        .btn-group { display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-top: 15px; }
+        button {
+            font-family: 'VT323', monospace;
+            background: #fff;
+            border: 2px solid #333;
+            padding: 10px 20px;
+            font-size: 22px;
+            cursor: pointer;
+            box-shadow: 3px 3px 0px #333;
+            transition: all 0.1s;
+        }
+        button:active { box-shadow: 1px 1px 0px #333; transform: translate(2px, 2px); }
+        button:hover { background: #ffe6e6; }
+        .btn-blue { background: #d0e8f2; }
+        .btn-blue:hover { background: #b5dbe9; }
+
+        img.pixel-art { max-width: 150px; margin-bottom: 15px; }
+        img.large-art { max-width: 90%; width: 350px; border-radius: 8px; margin-bottom: 15px; border: 2px solid #333; }
+
+        .loading-container { display: flex; gap: 5px; margin-top: 20px; }
+        .loading-box { width: 15px; height: 15px; border: 2px solid #333; }
+        .filled { background: #e91e63; }
+
+        .inventory-grid { display: flex; gap: 20px; justify-content: center; margin-bottom: 20px; }
+        .item { border: 2px dashed #999; padding: 20px; cursor: pointer; transition: 0.2s; font-size: 40px; }
+        .item:hover { background: #f0f0f0; border-style: solid; border-color: #333; }
+        .item p { font-size: 18px; margin: 10px 0 0 0; }
+        .item.viewed { background: #e8f5e9; border: 2px solid #4caf50; }
+        .typewriter-text { text-align: left; min-height: 150px; font-size: 24px; white-space: pre-wrap; }
+
+        /* === SPACEBAR SURPRISE ANIMATION === */
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(-120vh) scale(1.5) rotate(45deg); opacity: 0; }
+        }
+        .surprise-heart {
+            position: fixed;
+            font-size: 30px;
+            color: #e91e63;
+            z-index: 9999;
+            pointer-events: none; 
+        }
+
+        /* === SCROLL EDIT UI === */
+        #scroll-ui {
+            width: 100%;
+            position: relative;
+            background: linear-gradient(180deg, #ffe3ec 0%, #ffb8cc 20%, #ff9db8 50%, #ffb8cc 80%, #ffe3ec 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Quicksand', sans-serif;
+            color: white;
+            padding-bottom: 100px;
+            overflow-x: hidden;
+        }
+
+        .scroll-instruction {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+            font-weight: bold;
+            animation: bounceScroll 2s infinite;
+            position: relative;
+            z-index: 2;
+        }
+        @keyframes bounceScroll { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(20px); } }
+
+        /* A thread connecting every memory, top to bottom */
+        .memory-vine {
+            position: absolute;
+            top: 100vh;
+            bottom: 60px;
+            left: 50%;
+            width: 3px;
+            transform: translateX(-50%);
+            background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.9) 0, rgba(255,255,255,0.9) 8px, transparent 8px, transparent 18px);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Ambient falling petals, always drifting past while you scroll */
+        .petal-field { position: fixed; inset: 0; pointer-events: none; z-index: 6; overflow: hidden; }
+        .petal {
+            position: absolute;
+            top: -10vh;
+            font-size: 20px;
+            opacity: 0.85;
+            animation-name: petalDrift;
+            animation-timing-function: linear;
+            animation-iteration-count: infinite;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.12));
+        }
+        @keyframes petalDrift {
+            0%   { transform: translateY(0) translateX(0) rotate(0deg); }
+            50%  { transform: translateY(60vh) translateX(25px) rotate(180deg); }
+            100% { transform: translateY(120vh) translateX(-15px) rotate(360deg); }
+        }
+
+        .edit-section {
+            width: 100%;
+            min-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            box-sizing: border-box;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Scroll Animations */
+        .slide-left { transform: translateX(-150px); opacity: 0; transition: all 1.2s cubic-bezier(0.25, 1, 0.5, 1); }
+        .slide-right { transform: translateX(150px); opacity: 0; transition: all 1.2s cubic-bezier(0.25, 1, 0.5, 1); }
+        .zoom-in { transform: scale(0.6); opacity: 0; transition: all 1.2s cubic-bezier(0.25, 1, 0.5, 1); }
+        .fade-up { transform: translateY(100px); opacity: 0; transition: all 1.2s cubic-bezier(0.25, 1, 0.5, 1); }
+
+        /* When elements become visible on scroll */
+        .slide-left.visible, .slide-right.visible, .zoom-in.visible, .fade-up.visible {
+            opacity: 1;
+            transform: translate(0) scale(1);
+        }
+
+        /* Animation Delays */
+        .delay-1 { transition-delay: 0.1s; }
+        .delay-2 { transition-delay: 0.3s; }
+
+        /* Little chapter pill above each memory */
+        .memory-tag {
+            background: rgba(255,255,255,0.92);
+            color: #e91e63;
+            font-family: 'Quicksand', sans-serif;
+            font-weight: 600;
+            font-size: 14px;
+            letter-spacing: 1px;
+            padding: 6px 16px;
+            border-radius: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+            margin-bottom: 14px;
+        }
+
+        /* Polaroid-style photo frame with a washi-tape corner and a little charm */
+        .photo-frame {
+            position: relative;
+            width: 90%;
+            max-width: 350px;
+            margin: 10px 0 20px 0;
+            transform-origin: center;
+        }
+        .photo-frame.tilt-left { transform: rotate(-4deg); }
+        .photo-frame.tilt-right { transform: rotate(4deg); }
+
+        .slide-left.visible.tilt-left, .slide-right.visible.tilt-left, .zoom-in.visible.tilt-left, .fade-up.visible.tilt-left { transform: translate(0) scale(1) rotate(-4deg); }
+        .slide-left.visible.tilt-right, .slide-right.visible.tilt-right, .zoom-in.visible.tilt-right, .fade-up.visible.tilt-right { transform: translate(0) scale(1) rotate(4deg); }
+
+        .photo-frame::before {
+            content: "";
+            position: absolute;
+            top: -14px;
+            left: 50%;
+            transform: translateX(-50%) rotate(-3deg);
+            width: 70px;
+            height: 26px;
+            background: repeating-linear-gradient(45deg, #fff0d6, #fff0d6 6px, #ffe3b3 6px, #ffe3b3 12px);
+            opacity: 0.9;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.18);
+            z-index: 2;
+        }
+        .photo-frame::after {
+            content: "💗";
+            position: absolute;
+            bottom: -10px;
+            right: -10px;
+            font-size: 26px;
+            z-index: 2;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.25));
+        }
+
+        .edit-photo {
+            display: block;
+            width: 100%;
+            height: auto;
+            border-radius: 15px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+            border: 6px solid white;
+            box-sizing: border-box;
+        }
+
+        /* Extra glow + gentle breathing pulse on the finale photo */
+        .finale-glow .edit-photo {
+            box-shadow: 0 15px 30px rgba(0,0,0,0.2), 0 0 70px 25px rgba(255,255,255,0.55);
+            animation: pulse 2.8s ease-in-out infinite;
+        }
+
+        .finale-divider {
+            font-size: 22px;
+            letter-spacing: 10px;
+            margin-bottom: 6px;
+            opacity: 0.95;
+        }
+
+        .edit-lyric {
+            font-family: 'Dancing Script', cursive;
+            font-size: 34px;
+            text-align: center;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+            margin: 10px;
+            line-height: 1.3;
+            color: #6b1230;
+            background: rgba(255,255,255,0.55);
+            -webkit-backdrop-filter: blur(3px);
+            backdrop-filter: blur(3px);
+            padding: 14px 26px;
+            border-radius: 24px;
+            max-width: 90%;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+        }
+
+        /* === PICNIC CARPET UI === */
+        #picnic-ui {
+            width: 100%;
+            min-height: 100vh;
+            /* Dark pink base with vivid striped pattern */
+            background: repeating-linear-gradient(45deg, #ad1457, #ad1457 25px, #d81b60 25px, #d81b60 50px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 60px 20px;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+
+        .meme-frame {
+            background: #fff;
+            padding: 15px 15px 40px 15px; 
+            border-radius: 4px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            margin: 30px 0;
+            width: 90%;
+            max-width: 380px;
+            text-align: center;
+        }
+        
+        .meme-frame img {
+            width: 100%;
+            border-radius: 2px;
+        }
+
+        .meme-caption {
+            font-family: 'Dancing Script', cursive;
+            font-size: 30px;
+            color: #333;
+            margin-top: 15px;
+        }
+
+        .btn-picnic {
+            background: white;
+            color: #e91e63;
+            border: none;
+            padding: 15px 35px;
+            font-size: 22px;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            font-family: 'Quicksand', sans-serif;
+            font-weight: bold;
+            margin-top: 50px;
+            transition: 0.3s;
+            z-index: 10;
+        }
+
+        .btn-picnic:hover {
+            transform: scale(1.05);
+            background: #ffe3ec;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="liquid-bg"></div>
+
+    <div id="game-ui">
+        
+        <!-- 1. Launch Screen -->
+        <div id="screen-launch" class="content">
+            <h1>Happy Girlfriend's Dayyy</h1>
+            <h1 style="color: #e91e63; margin-top: 0;">Richuuuuu Babbbeeeyyyy!!!</h1>
+            <div class="heart-icon pulsing-heart" onclick="showLoading()">❤️</div>
+            <p style="border: 2px solid #333; padding: 5px 15px; font-size: 18px;">LOVE.exe</p>
+            <p style="font-size: 16px; color: #777;">Click the heart to launch</p>
+        </div>
+
+        <!-- 2. Loading Screen -->
+        <div id="screen-loading" class="content hidden">
+            <div class="heart-icon pulsing-heart">❤️</div>
+            <p>Loading...</p>
+            <div class="loading-container" id="loading-boxes">
+                <div class="loading-box"></div><div class="loading-box"></div>
+                <div class="loading-box"></div><div class="loading-box"></div>
+            </div>
+        </div>
+
+        <!-- 3. Hello Screen -->
+        <div id="screen-hello" class="window hidden">
+            <div class="title-bar"><span>❤️ Hello.exe</span><div class="dots"><div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div></div></div>
+            <div class="content">
+                <img class="pixel-art" src="https://media.tenor.com/Z4w2bH8i5hQAAAAi/peach-cat.gif" alt="Cute cat">
+                <p>Hey Smolll Babeyey... I made something just for you.<br><br>Continue?</p>
+                <div class="btn-group" style="position: relative; width: 100%; height: 50px;">
+                    <button onclick="changeScreen('screen-reward', 30)" style="position: absolute; left: 30%;">YES</button>
+                    <button id="btn-no" onmouseover="dodge()" ontouchstart="dodge()" style="position: absolute; left: 60%;">NO</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Reward Screen -->
+        <div id="screen-reward" class="window hidden">
+            <div class="title-bar"><span>🏆 Reward.exe</span><div class="dots"><div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div></div></div>
+            <div class="content">
+                <img class="large-art" src="GFCertificate.jpg" alt="Best GF Certificate">
+                <div style="border: 2px solid #333; padding: 10px; margin-bottom: 20px; width: 80%;">
+                    <p style="margin: 0; font-size: 20px; color: #555;">Achievement Unlocked</p>
+                    <p style="margin: 0; font-weight: bold; color: #e91e63;">Best Girlfriendd</p>
+                </div>
+                <p>+100 Love Points</p>
+                <button onclick="changeScreen('screen-question', 50)">CONTINUE</button>
+            </div>
+        </div>
+
+        <!-- 5. Question Screen -->
+        <div id="screen-question" class="window hidden">
+            <div class="title-bar"><span>❓ Question.exe</span><div class="dots"><div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div></div></div>
+            <div class="content">
+                <img class="pixel-art" style="max-width: 200px;" src="YouAreTheBest.gif" alt="Dinosaur You're the Best">
+                <p>Do you know how amazing you are?</p>
+                <div class="btn-group">
+                    <button class="btn-blue" onclick="changeScreen('screen-answer-not-really', 70)">NOT REALLY</button>
+                    <button class="btn-blue" onclick="changeScreen('screen-answer-maybe', 70)">MAYBE</button>
+                    <button class="btn-blue" onclick="changeScreen('screen-answer-of-course', 70)">OF COURSE</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. Answer Screens (Customized based on the choice) -->
+        <div id="screen-answer-not-really" class="window hidden">
+            <div class="title-bar"><span>💬 Answer.exe</span><div class="dots"><div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div></div></div>
+            <div class="content">
+                <p>Well, I'll just have to remind you every single day then. 😊</p>
+                <button onclick="changeScreen('screen-inventory', 85)">NEXT</button>
+            </div>
+        </div>
+
+        <div id="screen-answer-maybe" class="window hidden">
+            <div class="title-bar"><span>💬 Answer.exe</span><div class="dots"><div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div></div></div>
+            <div class="content">
+                <p>Only maybe?! Looks like I need to prove it to you even more. 😉</p>
+                <button onclick="changeScreen('screen-inventory', 85)">NEXT</button>
+            </div>
+        </div>
+
+        <div id="screen-answer-of-course" class="window hidden">
+            <div class="title-bar"><span>💬 Answer.exe</span><div class="dots"><div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div></div></div>
+            <div class="content">
+                <p>As you should! But I'm going to keep reminding you anyway. 🥰</p>
+                <button onclick="changeScreen('screen-inventory', 85)">NEXT</button>
+            </div>
+        </div>
+
+        <!-- 7. Inventory Screen -->
+        <div id="screen-inventory" class="window hidden">
+            <div class="title-bar"><span>🎒 Inventory.exe</span><div class="dots"><div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div></div></div>
+            <div class="content">
+                <p>Inventory<br><span style="font-size: 16px; color: #777;">Click items to open</span></p>
+                <div class="inventory-grid">
+                    <div class="item" id="item-flowers" onclick="openItem('screen-popup-flowers', 'item-flowers')">🌷</div>
+                    <div class="item" id="item-hugs" onclick="openItem('screen-popup-hugs', 'item-hugs')">🫂</div>
+                    <div class="item" id="item-letter" onclick="openItem('screen-popup-letter', 'item-letter'); typeLetter();">💌</div>
+                </div>
+                <button id="btn-finish" class="hidden" onclick="changeScreen('screen-final', 100)">CONTINUE</button>
+            </div>
+        </div>
+
+        <!-- Inventory Popups -->
+        <div id="screen-popup-flowers" class="window hidden">
+            <div class="title-bar"><span>🌷 flowers.exe</span></div>
+            <div class="content">
+                <img class="pixel-art" src="Flowers.gif" alt="Cats hugging">
+                <p>Flower for you my babeyy 💐</p>
+                <button onclick="closeItem('screen-inventory')">BACK</button>
+            </div>
+        </div>
+        <div id="screen-popup-hugs" class="window hidden">
+            <div class="title-bar"><span>🫂 hugs.exe</span></div>
+            <div class="content">
+                <img class="pixel-art" src="Hug.gif" alt="Cats hugging">
+                <p>Huggie lelo dhukkuuuu bebeeyy 🫂</p>
+                <button onclick="closeItem('screen-inventory')">BACK</button>
+            </div>
+        </div>
+        <div id="screen-popup-letter" class="window hidden">
+            <div class="title-bar"><span>💌 inbox.exe</span></div>
+            <div class="content">
+                <p style="font-size: 16px; color: #777; align-self: flex-start; margin-bottom: 5px;">To: My Worldd</p>
+                <div id="letter-content" class="typewriter-text"></div>
+                <button id="btn-close-letter" class="hidden" onclick="closeItem('screen-inventory')" style="margin-top: 20px;">BACK</button>
+            </div>
+        </div>
+
+        <!-- Final Screen -->
+        <div id="screen-final" class="content hidden" style="background: white; border-radius: 15px; padding: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+            <img class="pixel-art" src="https://media.tenor.com/tHqgU6-E7xIAAAAi/peach-cat.gif" alt="Happy cat">
+            <h1 style="color: #e91e63;">System Overload</h1>
+            <p>Too much love detected...</p>
+            <button onclick="startScrollEdit()" style="background: #e91e63; color: white; border-radius: 50px; font-size: 28px; padding: 15px 30px;">Initialize Surprise</button>
+        </div>
+    </div>
+
+    <!-- === SCROLL EDIT CONTAINER === -->
+    <div id="scroll-ui" class="hidden">
+        <div class="memory-vine"></div>
+        <div class="petal-field">
+            <span class="petal" style="left:5%; animation-duration:14s; animation-delay:-2s;">🌸</span>
+            <span class="petal" style="left:15%; animation-duration:18s; animation-delay:-7s;">🫶🏻</span>
+            <span class="petal" style="left:28%; animation-duration:12s; animation-delay:-1s;">💗</span>
+            <span class="petal" style="left:40%; animation-duration:20s; animation-delay:-11s;">🎀</span>
+            <span class="petal" style="left:55%; animation-duration:15s; animation-delay:-4s;">👸🏻</span>
+            <span class="petal" style="left:68%; animation-duration:17s; animation-delay:-9s;">🌸</span>
+            <span class="petal" style="left:78%; animation-duration:13s; animation-delay:-3s;">🫶🏻</span>
+            <span class="petal" style="left:88%; animation-duration:19s; animation-delay:-6s;">🎀</span>
+            <span class="petal" style="left:95%; animation-duration:16s; animation-delay:-13s;">👸🏻</span>
+        </div>
+
+        <div class="scroll-instruction">
+            Scroll Down <br> ⬇️ 
+        </div>
+
+        <!-- Section 1 -->
+        <div class="edit-section">
+            <div class="memory-tag zoom-in delay-1">🌸 Memory 1 of 7</div>
+            <div class="photo-frame tilt-left slide-left delay-1">
+                <img class="edit-photo" src="photo1.jpg" alt="Us">
+            </div>
+            <div class="edit-lyric slide-right delay-2">It started with just one glance <br>and somehow, I already knew.</div>
+        </div>
+
+        <!-- Section 2 -->
+        <div class="edit-section">
+            <div class="memory-tag zoom-in delay-1">🌸 Memory 2 of 7</div>
+            <div class="edit-lyric slide-left delay-2">Every ordinary day turns into<br>something special worth remembering with you.</div>
+            <div class="photo-frame tilt-right slide-right delay-1">
+                <img class="edit-photo" src="photo2.jpg" alt="Us">
+            </div>
+        </div>
+
+        <!-- Section 3 -->
+        <div class="edit-section">
+            <div class="memory-tag zoom-in delay-1">🌸 Memory 3 of 7</div>
+            <div class="photo-frame tilt-left zoom-in delay-1">
+                <img class="edit-photo" src="Photo3.png" alt="Us">
+            </div>
+            <div class="edit-lyric fade-up delay-2">Babee you are the sweetest and<br>the most beautiful human ever.</div>
+        </div>
+
+        <!-- Section 4 -->
+        <div class="edit-section">
+            <div class="memory-tag zoom-in delay-1">🌸 Memory 4 of 7</div>
+            <div class="edit-lyric slide-right delay-2">I never planned on falling this hard.<br>I'm glad I did anyway.</div>
+            <div class="photo-frame tilt-right slide-left delay-1">
+                <img class="edit-photo" src="photo4.jpg" alt="Us">
+            </div>
+        </div>
+
+        <!-- Section 5 -->
+        <div class="edit-section">
+            <div class="memory-tag zoom-in delay-1">🌸 Memory 5 of 7</div>
+            <div class="photo-frame tilt-left zoom-in delay-1">
+                <img class="edit-photo" src="photo5.jpg" alt="Us">
+            </div>
+            <div class="edit-lyric fade-up delay-2">Somewhere between the laughing<br>and the late night talks, we are growing together.</div>
+        </div>
+
+        <!-- Section 6 -->
+        <div class="edit-section">
+            <div class="memory-tag zoom-in delay-1">🌸 Memory 6 of 7</div>
+            <div class="edit-lyric slide-left delay-2">Stay here forever,<br>wrapped up in all these moments with me.</div>
+            <div class="photo-frame tilt-right slide-right delay-1">
+                <img class="edit-photo" src="Photo6.PNG" alt="Us">
+            </div>
+        </div>
+
+        <!-- Section 7 (Finale) -->
+        <div class="edit-section" style="min-height: 100vh;">
+            <div class="memory-tag zoom-in delay-1">🌸 Memory 7 of 7</div>
+            <div class="finale-divider">🌸 💌 🌷 💖 🌹</div>
+            <div class="photo-frame tilt-left fade-up delay-1 finale-glow">
+                <img class="edit-photo" src="photo7.jpg" alt="Us">
+            </div>
+            <div class="edit-lyric zoom-in delay-2" style="font-size: 44px; margin-top: 20px; color: #d80000; background: rgba(255,255,255,0.75);">Tonight, and every night after <br>you are my favorite kind of perfect. ❤️</div>
+            
+            <!-- THE NEW PICNIC TRANSITION BUTTON -->
+            <button class="btn-picnic fade-up delay-2" onclick="showPicnic()">One last thing... 👀</button>
+        </div>
+    </div>
+
+    <!-- === NEW PICNIC CARPET MEME SECTION === -->
+    <div id="picnic-ui" class="hidden">
+        <h1 class="zoom-in" style="color: white; text-shadow: 2px 2px 5px rgba(0,0,0,0.4); font-family: 'Quicksand', sans-serif; margin-bottom: 40px; text-align: center;">Just some totally normal things that remind me of us 🤭</h1>
+        
+        <div class="meme-frame tilt-left slide-left">
+            <img src="meme1.jpg" alt="Clingy Meme 1">
+            <div class="meme-caption">Literally me</div>
+        </div>
+        
+        <div class="meme-frame tilt-right slide-right">
+            <img src="meme2.jpg" alt="Clingy Meme 2">
+            <div class="meme-caption">Us 24/7</div>
+        </div>
+        
+        <div class="meme-frame tilt-left slide-left">
+            <img src="meme3.jpg" alt="Clingy Meme 3">
+            <div class="meme-caption">You dealing with my clinginess</div>
+        </div>
+        
+        <div class="meme-frame tilt-right slide-right">
+            <img src="meme4.jpg" alt="Clingy Meme 4">
+            <div class="meme-caption">No personal space allowed ❤️</div>
+        </div>
+    </div>
+
+    <script>
+        function switchScreenDisplay(id) {
+            document.querySelectorAll('#game-ui > div').forEach(el => el.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function changeScreen(id, liquidPercentage) {
+            switchScreenDisplay(id);
+            document.getElementById('liquid-bg').style.height = liquidPercentage + '%';
+        }
+
+        function showLoading() {
+            switchScreenDisplay('screen-loading');
+            document.getElementById('liquid-bg').style.height = '10%'; 
+            
+            const boxes = document.querySelectorAll('.loading-box');
+            let i = 0;
+            const interval = setInterval(() => {
+                if (i < boxes.length) {
+                    boxes[i].classList.add('filled');
+                    i++;
+                } else {
+                    clearInterval(interval);
+                    setTimeout(() => changeScreen('screen-hello', 15), 400);
+                }
+            }, 500);
+        }
+
+        function dodge() {
+            const btn = document.getElementById('btn-no');
+            const container = btn.parentElement;
+            const maxX = container.clientWidth - btn.clientWidth;
+            const maxY = container.clientHeight - btn.clientHeight;
+            
+            const randomX = Math.floor(Math.random() * maxX);
+            const randomY = Math.floor(Math.random() * (maxY + 50)) - 25;
+            
+            btn.style.left = randomX + 'px';
+            btn.style.top = randomY + 'px';
+        }
+
+        let itemsViewed = { flowers: false, hugs: false, letter: false };
+        
+        function openItem(screenId, itemId) {
+            switchScreenDisplay(screenId);
+            document.getElementById(itemId).classList.add('viewed');
+            
+            if (itemId === 'item-flowers') itemsViewed.flowers = true;
+            if (itemId === 'item-hugs') itemsViewed.hugs = true;
+            if (itemId === 'item-letter') itemsViewed.letter = true;
+
+            if (itemsViewed.flowers && itemsViewed.hugs && itemsViewed.letter) {
+                document.getElementById('btn-finish').classList.remove('hidden');
+            }
+        }
+
+        function closeItem(id) {
+            switchScreenDisplay(id);
+        }
+
+        const letterText = "I loveeeee yoooouuuuuu baaabeyeyy and I feel so lucky that you are with me and love me the way you do. I couldnt have asked for a more loving and caring partner than you.\n\nEveryday that passes by makes me realise more and more about how much I love you.\n\nYou are the most sweetest, prettiest and the most kuchupuchu babyy ever.\n\nI love youuu more than anything in this world and you are the only thing that matters to me in this whole world.\n\nThanks for loving me(Dumass) Shonaa\n\n(Hit Space for a surprise ✨)";
+        let i = 0;
+        let isTyping = false;
+
+        function typeLetter() {
+            if (isTyping) return;
+            isTyping = true;
+            document.getElementById('letter-content').innerHTML = '';
+            document.getElementById('btn-close-letter').classList.add('hidden');
+            i = 0;
+            typeChar();
+        }
+
+        function typeChar() {
+            if (i < letterText.length) {
+                document.getElementById('letter-content').innerHTML += letterText.charAt(i);
+                i++;
+                setTimeout(typeChar, 40);
+            } else {
+                document.getElementById('btn-close-letter').classList.remove('hidden');
+                isTyping = false;
+            }
+        }
+
+        document.addEventListener('keydown', function(event) {
+            if (event.code === 'Space' && !document.getElementById('screen-popup-letter').classList.contains('hidden')) {
+                event.preventDefault(); 
+                triggerHeartExplosion();
+            }
+        });
+
+        function triggerHeartExplosion() {
+            for (let j = 0; j < 40; j++) {
+                setTimeout(createHeart, j * 50); 
+            }
+        }
+
+        function createHeart() {
+            const heart = document.createElement('div');
+            heart.innerHTML = ['❤️', '💖', '✨', '💐'][Math.floor(Math.random() * 4)];
+            heart.classList.add('surprise-heart');
+            
+            heart.style.left = Math.random() * 100 + 'vw';
+            heart.style.top = '100vh';
+            
+            heart.style.fontSize = (Math.random() * 20 + 20) + 'px';
+            const duration = Math.random() * 2 + 3; 
+            heart.style.animation = `floatUp ${duration}s linear forwards`;
+            
+            document.body.appendChild(heart);
+            
+            setTimeout(() => {
+                heart.remove();
+            }, duration * 1000);
+        }
+
+        // Global observer so we can reuse it
+        const scrollObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.15 });
+
+        function startScrollEdit() {
+            document.getElementById('game-ui').style.display = 'none';
+            document.getElementById('liquid-bg').style.display = 'none';
+            
+            document.body.style.overflow = 'auto';
+            document.body.style.backgroundColor = '#ffb3c6'; 
+            
+            document.getElementById('scroll-ui').classList.remove('hidden');
+
+            document.querySelectorAll('#scroll-ui .slide-left, #scroll-ui .slide-right, #scroll-ui .zoom-in, #scroll-ui .fade-up').forEach(el => scrollObserver.observe(el));
+        }
+
+        // NEW LOGIC FOR THE PICNIC CARPET TRANSITION
+        function showPicnic() {
+            // Hide the photo scroll
+            document.getElementById('scroll-ui').style.display = 'none';
+            
+            // Show the new picnic layout
+            const picnicUI = document.getElementById('picnic-ui');
+            picnicUI.classList.remove('hidden');
+            
+            // Instantly snap to the top of the new page
+            window.scrollTo({ top: 0 });
+
+            // Apply the same awesome slide/zoom animations to your memes as you scroll
+            document.querySelectorAll('#picnic-ui .slide-left, #picnic-ui .slide-right, #picnic-ui .zoom-in').forEach(el => scrollObserver.observe(el));
+        }
+    </script>
+</body>
+</html>
